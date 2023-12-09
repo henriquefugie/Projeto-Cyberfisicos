@@ -1,0 +1,70 @@
+MODULE main
+
+
+VAR
+        state: {w1, w2, all_stop, e1, e2};
+        west_light: {red, green};
+        east_light: {red, green};
+        at_w: boolean;
+        at_e: boolean;
+        on_bridge: boolean;
+        cont: 1 ..5;
+        timeout: boolean;
+ASSIGN
+    init(state) := all_stop;
+    init(west_light) := green;
+    init(east_light) := red;
+    init(at_w) := TRUE;
+    init(at_e) := TRUE;
+    init(on_bridge) := FALSE;
+    init(cont) := 1;
+    init(timeout):= FALSE;
+
+
+    next(state) := case state = all_stop & at_w = TRUE & west_light = green : w1;
+                        state = all_stop & at_e = TRUE & east_light = green : e1;
+
+                        state = w1 & on_bridge = TRUE & timeout = FALSE: w2;
+                        state = w1 & timeout = FALSE: w1;
+                        state = w1 & timeout = TRUE: all_stop;
+
+                        state = e1 & on_bridge = TRUE & timeout = FALSE: e2;
+                        state = e1 & timeout = FALSE: e1;
+                        state = e1 & timeout = TRUE: all_stop;
+
+                        state = w2 & (timeout = TRUE | on_bridge = FALSE): all_stop;
+                        state = e2 & (timeout = TRUE | on_bridge = FALSE): all_stop;
+                        TRUE: state;
+                        esac;
+
+    next(west_light):= case west_light = green & timeout = TRUE: red;
+                            east_light = red: green;
+                             TRUE: west_light;
+                            esac;
+
+    next(east_light):= case east_light = green & timeout = TRUE: red;
+                            west_light = red: green;
+                            TRUE: east_light;
+                            esac;
+
+    next(cont):= case cont = 1 & state = w1: 2;
+                      cont = 2 & state = w1: 3;
+                      cont = 3 & state = w1: 4;
+                      cont = 4 & state = w1: 5;
+                      cont = 5 & state = w1: 1;
+
+                      cont = 1 & state = e1: 2;
+                      cont = 2 & state = e1: 3;
+                      cont = 3 & state = e1: 4;
+                      cont = 4 & state = e1: 5;
+                      cont = 5 & state = e1: 1;
+                      TRUE: cont;
+                      esac;
+
+    next(timeout):= case timeout = TRUE & state = all_stop: FALSE;
+                         timeout = FALSE & cont = 5: TRUE;
+                         TRUE: timeout;
+                         esac; 
+
+SPEC
+    AG(TRUE)
