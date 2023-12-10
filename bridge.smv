@@ -3,8 +3,7 @@ MODULE main
 
 VAR
         state: {w1, w2, all_stop, e1, e2};
-        west_light: {red, green};
-        east_light: {red, green};
+        semaforo: {w_green, e_green};
         at_w: boolean;
         at_e: boolean;
         on_bridge: boolean;
@@ -12,8 +11,7 @@ VAR
         timeout: boolean;
 ASSIGN
     init(state) := all_stop;
-    init(west_light) := green;
-    init(east_light) := red;
+    init(semaforo) := w_green;
     init(at_w) := TRUE;
     init(at_e) := TRUE;
     init(on_bridge) := FALSE;
@@ -21,8 +19,8 @@ ASSIGN
     init(timeout):= FALSE;
 
 
-    next(state) := case state = all_stop & at_w = TRUE & west_light = green : w1;
-                        state = all_stop & at_e = TRUE & east_light = green : e1;
+    next(state) := case state = all_stop & at_w = TRUE & semaforo = w_green : w1;
+                        state = all_stop & at_e = TRUE & semaforo = e_green : e1;
 
                         state = w1 & on_bridge = TRUE & timeout = FALSE: w2;
                         state = w1 & timeout = FALSE: w1;
@@ -37,15 +35,11 @@ ASSIGN
                         TRUE: state;
                         esac;
 
-    next(west_light):= case west_light = green & timeout = TRUE: red;
-                            east_light = red: green;
-                             TRUE: west_light;
-                            esac;
-
-    next(east_light):= case east_light = green & timeout = TRUE: red;
-                            west_light = red: green;
-                            TRUE: east_light;
-                            esac;
+    next(semaforo):= case semaforo = w_green & timeout = TRUE: e_green;
+                          semaforo = w_green & timeout = FALSE: w_green;
+                          semaforo = e_green & timeout = TRUE: w_green;
+                          semaforo = e_green & timeout = FALSE: e_green;
+                          esac;
 
     next(cont):= case cont = 1 & state = w1: 2;
                       cont = 2 & state = w1: 3;
@@ -66,5 +60,5 @@ ASSIGN
                          TRUE: timeout;
                          esac; 
 
-SPEC
-    AG(TRUE)
+LTLSPEC
+    G !(semaforo = w_green & semaforo = e_green);
