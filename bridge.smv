@@ -1,15 +1,17 @@
 MODULE main
 
-
 VAR
-        state: {w1, w2, all_stop, e1, e2};
-        semaforo: {w_green, e_green};
-        at_w: boolean;
-        at_e: boolean;
-        on_bridge: boolean;
-        cont: 1 ..5;
-        timeout: boolean;
+
+    state: {w1, w2, all_stop, e1, e2};
+    semaforo: {w_green, e_green};
+    at_w: boolean;
+    at_e: boolean;
+    on_bridge: boolean;
+    cont: 1 ..5;
+    timeout: boolean;
+
 ASSIGN
+
     init(state) := all_stop;
     init(semaforo) := w_green;
     init(at_w) := TRUE;
@@ -18,8 +20,9 @@ ASSIGN
     init(cont) := 1;
     init(timeout):= FALSE;
 
+    next(state) := case 
 
-    next(state) := case state = all_stop & at_w = TRUE & semaforo = w_green : w1;
+                        state = all_stop & at_w = TRUE & semaforo = w_green : w1;
                         state = all_stop & at_e = TRUE & semaforo = e_green : e1;
 
                         state = w1 & on_bridge = TRUE & timeout = FALSE: w2;
@@ -33,32 +36,84 @@ ASSIGN
                         state = w2 & (timeout = TRUE | on_bridge = FALSE): all_stop;
                         state = e2 & (timeout = TRUE | on_bridge = FALSE): all_stop;
                         TRUE: state;
+
                         esac;
 
-    next(semaforo):= case semaforo = w_green & timeout = TRUE: e_green;
-                          semaforo = w_green & timeout = FALSE: w_green;
-                          semaforo = e_green & timeout = TRUE: w_green;
-                          semaforo = e_green & timeout = FALSE: e_green;
-                          esac;
+    next(semaforo):= case 
 
-    next(cont):= case cont = 1 & state = w1: 2;
-                      cont = 2 & state = w1: 3;
-                      cont = 3 & state = w1: 4;
-                      cont = 4 & state = w1: 5;
-                      cont = 5 & state = w1: 1;
+                            semaforo = w_green & timeout = TRUE: e_green;
+                            semaforo = w_green & timeout = FALSE: w_green;
+                            semaforo = e_green & timeout = TRUE: w_green;
+                            semaforo = e_green & timeout = FALSE: e_green;
 
-                      cont = 1 & state = e1: 2;
-                      cont = 2 & state = e1: 3;
-                      cont = 3 & state = e1: 4;
-                      cont = 4 & state = e1: 5;
-                      cont = 5 & state = e1: 1;
-                      TRUE: cont;
-                      esac;
+                            esac;
 
-    next(timeout):= case timeout = TRUE & state = all_stop: FALSE;
-                         timeout = FALSE & cont = 5: TRUE;
-                         TRUE: timeout;
-                         esac; 
+    next(cont):= case 
+                    
+                        cont = 1 & state = w1: 2;
+                        cont = 2 & state = w1: 3;
+                        cont = 3 & state = w1: 4;
+                        cont = 4 & state = w1: 5;
+                        cont = 5 & state = w1: 1;
 
+                        cont = 1 & state = e1: 2;
+                        cont = 2 & state = e1: 3;
+                        cont = 3 & state = e1: 4;
+                        cont = 4 & state = e1: 5;
+                        cont = 5 & state = e1: 1;
+                        TRUE: cont;
+
+                        esac;
+
+    next(timeout):= case 
+
+                            timeout = TRUE & state = all_stop: FALSE;
+                            timeout = FALSE & cont = 5: TRUE;
+                            TRUE: timeout;
+
+                            esac; 
+
+-- As regras ctl executam primeiro que as regras ltl, então na hora de verificar as saidas do programa, as regras ctl vão estar em cima
+-- Regras 1 = Regras LTL
+-- Regras 2 = Regras CTl
+
+-- Regras 1
+-- letra a (Esta regra diz que não existe nenhum caso na implementacao onde ambos os semaforos, do lado leste e lado oeste ficam verdes simultaneamente)
 LTLSPEC
     G !(semaforo = w_green & semaforo = e_green);
+
+-- Regras 1
+-- letra b (Esta regra diz que se um semaforo de um dos lados é verde, enventualmente ele vai ficar vermelho em algum ponto futuro)
+LTLSPEC 
+    G (semaforo = w_green -> F semaforo = e_green);
+
+-- Regras 1
+-- letra c (Essa regra diz que a luz do semaforo a oeste nunca é verde por mais de 5 passos consecutivos)
+LTLSPEC 
+    G (semaforo = w_green -> (cont <= 5));
+
+-- Regras 1
+-- Letra d (Nesta regra nos temos duas condicoes que diz: Sempre que houver um carro no semáforo oeste, eventualmente o semáforo oeste ficará verde)
+-- i: Nesta parte, ele precisa assumir que se os carros estão na ponte, eventualmente todos os carros vão estar fora da ponte
+LTLSPEC 
+    G (at_w -> F (semaforo = w_green) & G (on_bridge -> F !on_bridge));
+-- ii: Nesta segunda parte, se os carros estão parados na luz vermelha, o carro permanecerá na luz vermelha até que ocorra o primeiro step quando a luz estiver verde
+LTLSPEC 
+    G (at_w -> F (semaforo = w_green) & G (at_e -> ((semaforo = e_green) V (semaforo = e_green))) & G (at_w -> (semaforo = w_green U (semaforo = w_green))));
+
+-- Regras 1
+-- Letra e (A regra fala que devemos cumprir: Sempre que houver um carro no semáforo oeste, eventualmente o semáforo oeste ficará verde, sob o suposição de que se os carros estiverem na ponte, eventualmente todos os carros estarão fora da ponte.)
+LTLSPEC 
+G (at_w -> (semaforo = w_green) V (on_bridge U (!on_bridge)));
+
+-- Regras 2
+-- Letra a (Esta regra pede para verficarmos se: Existe uma execução no sistema em que em algum ponto o semáforo oeste é verde e em algum ponto o semáforo leste é verde)
+SPEC
+    EF (semaforo = w_green & EF(semaforo = e_green));
+
+-- Regras 2
+-- Letra b (A regra da letra b visa verificar: Sempre que o semáforo leste estiver verde e um carro estiver na ponte, é possível que o semáforo leste
+-- então permanece verde para sempre.)
+-- Neste caso ela da False, pois a luz east pode ficar vermelha, e nunca vai ficar verde para sempre
+SPEC
+    AG (semaforo = e_green & on_bridge = TRUE -> AF AG(semaforo = e_green));
